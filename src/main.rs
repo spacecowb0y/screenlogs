@@ -1,6 +1,5 @@
 use mac_address::get_mac_address;
-use reqwest::blocking::multipart;
-use reqwest::blocking::Client;
+use reqwest::{blocking::multipart, blocking::Client};
 use screenshots::Screen;
 use std::{
     io::Read,
@@ -23,45 +22,69 @@ fn main() {
 fn upload_screenshots() -> Result<(), Box<dyn std::error::Error>> {
     let screens = Screen::all()?;
     let client = Client::new();
+    let form = create_multipart_form(&screens)?;
 
-    let mut form = multipart::Form::new();
-    form = form.text(
-        "mac_address",
-        get_mac_address()
-            .expect("mac address error")
-            .unwrap()
-            .to_string(),
-    );
+    let mut request = client
+        .post(API_ENDPOINT)
+        .multipart(form.try_into()?)
+        .send()?;
 
-    for screen in screens {
-        let image = screen.capture()?;
-        let image_data = image.to_png()?;
-
-        let file_name = format!(
-            "screenshot-{}-{}.png",
-            screen.display_info.id,
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .expect("time error")
-                .as_secs()
-        );
-
-        let part = multipart::Part::bytes(image_data)
-            .file_name(file_name)
-            .mime_str("image/png")?;
-
-        form = form.part("images", part);
-    }
-
-    let request = client.post(API_ENDPOINT).multipart(form).build()?;
-
-    let mut response = client.execute(request)?;
-    let status = response.status();
+    let status = request.status();
     println!("Screenshots uploaded with status: {}", status);
 
     let mut body = Vec::new();
-    response.read_to_end(&mut body)?;
+    request.read_to_end(&mut body)?;
     println!("Response Body: {:?}", body);
 
     Ok(())
+}
+
+fn create_multipart_form(
+    screens: &[Screen],
+) -> Result<multipart::Form, Box<dyn std::error::Error>> {
+    let mut form = multipart::Form::new();
+    form = add_mac_address_field(form)?;
+    for screen in screens {
+        let image_data = capture_screenshot(screen)?;
+        let file_name = generate_file_name(screen)?;
+        let part = create_multipart_part(image_data, file_name)?;
+        form = add_multipart_part(form, part);
+    }
+    Ok(form)
+}
+
+fn add_mac_address_field(
+    form: multipart::Form,
+) -> Result<multipart::Form, Box<dyn std::error::Error>> {
+    let mac_address = get_mac_address()?.ok_or("mac address error")?.to_string();
+    Ok(form.text("mac_address", mac_address))
+}
+
+fn capture_screenshot(screen: &Screen) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let image = screen.capture()?;
+    image.to_png().map_err(|e| e.into())
+}
+
+fn generate_file_name(screen: &Screen) -> Result<String, Box<dyn std::error::Error>> {
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH)?;
+    let file_name = format!(
+        "screenshot-{}-{}.png",
+        screen.display_info.id,
+        duration.as_secs()
+    );
+    Ok(file_name)
+}
+
+fn create_multipart_part(
+    image_data: Vec<u8>,
+    file_name: String,
+) -> Result<multipart::Part, Box<dyn std::error::Error>> {
+    let part = multipart::Part::bytes(image_data)
+        .file_name(file_name)
+        .mime_str("image/png")?;
+    Ok(part)
+}
+
+fn add_multipart_part(form: multipart::Form, part: multipart::Part) -> multipart::Form {
+    form.part("images", part)
 }
