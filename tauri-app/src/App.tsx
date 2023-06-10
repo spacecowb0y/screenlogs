@@ -4,12 +4,9 @@ import { invoke } from "@tauri-apps/api/tauri";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    console.log(await invoke("upload_screenshots"));
+  async function screenshot() {
+    await invoke("upload_screenshots");
   }
 
   return (
@@ -32,17 +29,11 @@ function App() {
 
       <br />
 
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <button type="submit">Take Screenshot</button>
-      </form>
-
-      <p>{greetMsg}</p>
+      <p>
+        <button type="submit" onClick={() => screenshot()}>
+          Take Screenshot
+        </button>
+      </p>
     </div>
   );
 }
