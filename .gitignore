@@ -1,0 +1,6 @@
+/target
+node_modules/
+api/public/uploads/*
+!api/public/uploads/*.gitkeep
+package-lock.json
+*.sqlite3
