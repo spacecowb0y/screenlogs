@@ -1,39 +1,38 @@
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use mac_address::get_mac_address;
-use reqwest::{blocking::multipart, blocking::Client};
+use reqwest::multipart;
+use reqwest::Client;
 use screenshots::Screen;
-use std::{
-    io::Read,
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const API_ENDPOINT: &str = "http://0.0.0.0:3000/upload";
-const DURATION: u64 = 300;
 
-fn main() {
-    loop {
-        if let Err(err) = upload_screenshots() {
+#[tauri::command]
+fn upload_screenshots() {
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = upload_screenshots_internal().await {
             eprintln!("Error: {}", err);
         }
-        thread::sleep(Duration::from_secs(DURATION));
-    }
+    });
 }
 
-fn upload_screenshots() -> Result<(), Box<dyn std::error::Error>> {
+async fn upload_screenshots_internal() -> Result<(), Box<dyn std::error::Error>> {
     let screens = Screen::all()?;
     let client = Client::new();
     let form = create_multipart_form(&screens)?;
 
-    let mut request = client
+    let request = client
         .post(API_ENDPOINT)
         .multipart(form.try_into()?)
-        .send()?;
+        .send()
+        .await?;
 
     let status = request.status();
     println!("Screenshots uploaded with status: {}", status);
 
-    let mut body = Vec::new();
-    request.read_to_end(&mut body)?;
+    let body = request.bytes().await?;
     println!("Response Body: {:?}", body);
 
     Ok(())
@@ -87,4 +86,11 @@ fn create_multipart_part(
 
 fn add_multipart_part(form: multipart::Form, part: multipart::Part) -> multipart::Form {
     form.part("images", part)
+}
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![upload_screenshots])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
