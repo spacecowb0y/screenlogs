@@ -1,4 +1,4 @@
-# 📸 Rust Screenshot Uploader
+# 📸 Screenlogs
 
 This application is a Rust-based tool that captures screenshots for each screen of your device at certain intervals and submits them to a remote server along with the MAC address of the device. It's a fun and convenient way to keep track of what's happening on your screen over time. 🖥️
 
@@ -25,7 +25,7 @@ git clone https://github.com/spacecowb0y/screenshots.git
 2. Navigate to the project directory:
 
 ```
-cd screenshots
+cd screenlogs
 ```
 
 3. Install the Rust dependencies using Cargo:
